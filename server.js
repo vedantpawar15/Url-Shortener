@@ -1,9 +1,15 @@
 const express = require("express")
-const app = express()
+const cors = require("cors")
+
+const app = express()   // ✅ FIRST create app
+
+app.use(cors())         // ✅ THEN use it
+app.get("/", (req, res) => {
+    res.send("URL Shortener Running 🚀")
+})
+app.use(express.json())
 
 console.log("NEW SERVER CODE RUNNING 🚀")
-
-app.use(express.json())
 
 const urlMap = {}
 
