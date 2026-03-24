@@ -16,7 +16,11 @@ mongoose.connect("mongodb+srv://Vedant:vedant123@url-shortener-cluster.5uds6cb.m
 // 📦 Schema + Model
 const urlSchema = new mongoose.Schema({
     shortCode: String,
-    originalUrl: String
+    originalUrl: String,
+    clicks: {
+        type: Number,
+        default: 0
+    }
 })
 
 const Url = mongoose.model("Url", urlSchema)
@@ -65,19 +69,21 @@ app.get("/:code", async (req, res) => {
     try {
         const code = req.params.code
 
-        console.log("Looking for:", code)
-
         const url = await Url.findOne({ shortCode: code })
 
         if (url) {
-            console.log("Redirecting to:", url.originalUrl)
+            url.clicks += 1
+            await url.save()
+
+            console.log("Clicks:", url.clicks)
+
             res.redirect(url.originalUrl)
         } else {
             res.send("URL not found ❌")
         }
 
     } catch (err) {
-        console.log("Error:", err)
+        console.log(err)
         res.status(500).send("Server Error ❌")
     }
 })
