@@ -1,61 +1,89 @@
-const fs = require("fs")
 const express = require("express")
-const cors = require("cors")
+const mongoose = require("mongoose")
 
-function readData() {
-    const data = fs.readFileSync("data.json")
-    return JSON.parse(data)
-}
-
-function writeData(data) {
-    fs.writeFileSync("data.json", JSON.stringify(data, null, 2))
-}
-
-const app = express()   // ✅ FIRST create app
-
-app.use(cors())         // ✅ THEN use it
-app.get("/", (req, res) => {
-    res.send("URL Shortener Running 🚀")
-})
+const app = express()
 app.use(express.json())
 
-console.log("NEW SERVER CODE RUNNING 🚀")
-
-const urlMap = {}
-
-function generateCode() {
-    return Math.random().toString(36).substring(2, 7)
-}
-
-app.post("/shorten", (req, res) => {
-    const { originalUrl } = req.body
-
-    const code = Math.random().toString(36).substring(2, 8)
-
-    const data = readData()       // read file
-    data[code] = originalUrl      // add new entry
-    writeData(data)               // save file
-
-    res.json({ shortUrl: `http://localhost:4000/${code}` })
+// 🔌 MongoDB Connection
+mongoose.connect("mongodb+srv://Vedant:vedant123@url-shortener-cluster.5uds6cb.mongodb.net/urlShortener?retryWrites=true&w=majority")
+.then(() => {
+    console.log("MongoDB connected ✅")
+})
+.catch(err => {
+    console.log("MongoDB connection error ❌")
+    console.log(err)
+})
+// 📦 Schema + Model
+const urlSchema = new mongoose.Schema({
+    shortCode: String,
+    originalUrl: String
 })
 
-app.get("/:code", (req, res) => {
-    const code = req.params.code
+const Url = mongoose.model("Url", urlSchema)
 
-    const data = readData()
-    console.log("Code:", code)
-    console.log("Data:", data)
+// 🧪 Test route
+app.get("/test", (req, res) => {
+    res.send("Server working ✅")
+})
 
-    const originalUrl = data[code]
+// 🔗 POST → Create short URL
+app.post("/shorten", async (req, res) => {
+    try {
+        let { originalUrl } = req.body
 
-    if (originalUrl) {
-        console.log("Redirecting to:", originalUrl)
-        res.redirect(originalUrl)
-    } else {
-        res.send("URL not found ❌")
+        if (!originalUrl) {
+            return res.send("URL is required ❌")
+        }
+
+        if (!originalUrl.startsWith("http")) {
+            originalUrl = "https://" + originalUrl
+        }
+
+        const code = Math.random().toString(36).substring(2, 8)
+
+        console.log("Saving:", code, originalUrl)
+
+        const newUrl = new Url({
+            shortCode: code,
+            originalUrl: originalUrl
+        })
+
+        await newUrl.save()
+
+        console.log("Saved to MongoDB ✅")
+
+        res.json({ shortUrl: `http://localhost:4000/${code}` })
+
+    } catch (err) {
+        console.log("Error:", err)
+        res.status(500).send("Server Error ❌")
     }
 })
 
+// 🔁 GET → Redirect
+app.get("/:code", async (req, res) => {
+    try {
+        const code = req.params.code
+
+        console.log("Looking for:", code)
+
+        const url = await Url.findOne({ shortCode: code })
+
+        if (url) {
+            console.log("Redirecting to:", url.originalUrl)
+            res.redirect(url.originalUrl)
+        } else {
+            res.send("URL not found ❌")
+        }
+
+    } catch (err) {
+        console.log("Error:", err)
+        res.status(500).send("Server Error ❌")
+    }
+})
+
+// 🚀 Start server
 app.listen(4000, () => {
+    console.log("NEW SERVER CODE RUNNING 🚀")
     console.log("Server running on http://localhost:4000")
 })
