@@ -1,95 +1,54 @@
 const express = require("express")
 const mongoose = require("mongoose")
+const shortid = require("shortid")
+const URL = require("./models/url")
 
 const app = express()
+const PORT = 3000
+
+// Middleware
 app.use(express.json())
 
-// 🔌 MongoDB Connection
-mongoose.connect("mongodb+srv://Vedant:vedant123@url-shortener-cluster.5uds6cb.mongodb.net/urlShortener?retryWrites=true&w=majority")
-.then(() => {
-    console.log("MongoDB connected ✅")
-})
-.catch(err => {
-    console.log("MongoDB connection error ❌")
-    console.log(err)
-})
-// 📦 Schema + Model
-const urlSchema = new mongoose.Schema({
-    shortCode: String,
-    originalUrl: String,
-    clicks: {
-        type: Number,
-        default: 0
-    }
-})
+// MongoDB Connection
+mongoose.connect("mongodb://127.0.0.1:27017/urlShortener")
+    .then(() => console.log("MongoDB Connected ✅"))
+    .catch(err => console.log(err))
 
-const Url = mongoose.model("Url", urlSchema)
-
-// 🧪 Test route
-app.get("/test", (req, res) => {
-    res.send("Server working ✅")
-})
-
-// 🔗 POST → Create short URL
+// POST - Create short URL
 app.post("/shorten", async (req, res) => {
-    try {
-        let { originalUrl } = req.body
+    const { originalUrl } = req.body
 
-        if (!originalUrl) {
-            return res.send("URL is required ❌")
-        }
-
-        if (!originalUrl.startsWith("http")) {
-            originalUrl = "https://" + originalUrl
-        }
-
-        const code = Math.random().toString(36).substring(2, 8)
-
-        console.log("Saving:", code, originalUrl)
-
-        const newUrl = new Url({
-            shortCode: code,
-            originalUrl: originalUrl
-        })
-
-        await newUrl.save()
-
-        console.log("Saved to MongoDB ✅")
-
-        res.json({ shortUrl: `http://localhost:4000/${code}` })
-
-    } catch (err) {
-        console.log("Error:", err)
-        res.status(500).send("Server Error ❌")
+    if (!originalUrl) {
+        return res.status(400).json({ error: "URL is required" })
     }
+
+    const shortCode = shortid.generate()
+
+    await URL.create({
+        shortId: shortCode,
+        redirectURL: originalUrl
+    })
+
+    res.json({ shortCode })
 })
 
-// 🔁 GET → Redirect
+// GET - Redirect
 app.get("/:code", async (req, res) => {
-    try {
-        const code = req.params.code
+    const code = req.params.code
 
-        const url = await Url.findOne({ shortCode: code })
+    const entry = await URL.findOne({ shortId: code })
 
-        if (url) {
-            url.clicks += 1
-            await url.save()
+    if (entry) {
+        entry.clicks++
+        await entry.save()
 
-            console.log("Clicks:", url.clicks)
-
-            res.redirect(url.originalUrl)
-        } else {
-            res.send("URL not found ❌")
-        }
-
-    } catch (err) {
-        console.log(err)
-        res.status(500).send("Server Error ❌")
+        return res.redirect(entry.redirectURL)
+    } else {
+        return res.status(404).send("URL not found ❌")
     }
 })
 
-// 🚀 Start server
-app.listen(4000, () => {
-    console.log("NEW SERVER CODE RUNNING 🚀")
-    console.log("Server running on http://localhost:4000")
+// Start server
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT} 🚀`)
 })
