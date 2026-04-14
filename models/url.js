@@ -1,15 +1,11 @@
 const mongoose = require("mongoose");
 
-const urlSchema = new mongoose.Schema({
-    originalUrl: {
-        type: String,
-        required: true,
-    },
-    shortCode: {
-        type: String,
-        required: true,
-        unique: true,
-    },
-});
+const urlSchema = new mongoose.Schema(
+  {
+    originalUrl: { type: String, required: true },
+    shortCode: { type: String, required: true, unique: true, index: true },
+  },
+  { timestamps: true }
+);
 
-module.exports = mongoose.model("URL", urlSchema);
+module.exports = mongoose.models.URL || mongoose.model("URL", urlSchema);
